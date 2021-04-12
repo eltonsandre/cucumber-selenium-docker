@@ -1,0 +1,102 @@
+plugins {
+    id 'java'
+}
+
+ext {
+    set('lombokVersion', '1.18.18')
+    set('jacksonVersion', '2.12.2')
+
+    set('junitJupiteVersion', '5.7.1')
+    set('seleniumJavaVersion', '3.141.59')
+    set('cucumberVersion', '6.8.1')
+
+    set('testcontainersVersion', '1.15.2')
+    set('wiremockVersion', '2.27.2')
+}
+
+repositories {
+    mavenCentral()
+}
+
+group 'com.github.eltonsandre'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_15
+targetCompatibility = JavaVersion.VERSION_15
+
+compileJava.options.encoding = "UTF-8"
+compileTestJava.options.encoding = "UTF-8"
+compileJava.dependsOn(processResources)
+
+
+dependencies {
+
+    testCompileOnly "org.projectlombok:lombok:$lombokVersion"
+    testImplementation "org.projectlombok:lombok:$lombokVersion"
+    testAnnotationProcessor "org.projectlombok:lombok:$lombokVersion"
+
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitJupiteVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiteVersion"
+
+    testImplementation "io.cucumber:cucumber-java:$cucumberVersion",
+            "io.cucumber:cucumber-junit:$cucumberVersion"
+
+    testImplementation "org.seleniumhq.selenium:selenium-java:$seleniumJavaVersion",
+            "org.seleniumhq.selenium:selenium-server:$seleniumJavaVersion",
+            "org.seleniumhq.selenium:selenium-remote-driver:$seleniumJavaVersion"
+
+    testImplementation "org.testcontainers:selenium:$testcontainersVersion",
+            "org.testcontainers:junit-jupiter:$testcontainersVersion",
+            "org.testcontainers:testcontainers:$testcontainersVersion"
+
+    testImplementation "com.github.tomakehurst:wiremock:$wiremockVersion@pom",
+            "com.github.tomakehurst:wiremock-jre8:$wiremockVersion"
+
+    testImplementation 'io.vavr:vavr:0.10.3',
+            'commons-io:commons-io:2.8.0'
+
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
+            "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+
+    testImplementation 'ch.qos.logback:logback-classic:1.2.3'
+}
+
+clean.doFirst {
+    delete 'build', 'out', 'dist'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+task unitTest(type: Test) {
+    useJUnitPlatform() {
+        includeTags('unitTest')
+        excludeTags('integrationTest')
+    }
+}
+
+task integrationTest(type: Test) {
+    useJUnitPlatform() {
+        excludeTags('unitTest')
+        includeTags('integrationTest')
+    }
+}
+
+task cucumber() {
+    dependsOn assemble, compileTestJava
+    doLast {
+        javaexec {
+            main = "io.cucumber.core.cli.Main"
+            classpath = configurations.cucumberRuntime + sourceSets.main.output + sourceSets.test.output
+            args = ['--plugin', 'pretty', '--glue', 'hellocucumber', 'src/test/resources']
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '--enable-preview'
+}
+tasks.withType(Test) {
+    jvmArgs += '--enable-preview'
+}

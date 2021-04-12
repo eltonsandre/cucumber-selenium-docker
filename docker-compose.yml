@@ -1,0 +1,106 @@
+version: "3.8"
+
+# VNC acesso remoto pass: secret
+
+x-default-browser: &x-default-browser
+  tty: true
+  stdin_open: true
+  stop_signal: SIGKILL
+  depends_on:
+    - selenium-hub
+  volumes:
+    - /dev/shm:/dev/shm
+  links:
+    - selenium-hub
+  environment: &x-default-browser-env
+    VNC_NO_PASSWORD: 1
+    HUB_HOST: selenium-hub
+    HUB_PORT: 4444
+    SE_NODE_MAX_SESSIONS: 2
+    SE_EVENT_BUS_HOST: selenium-hub
+    SE_EVENT_BUS_PUBLISH_PORT: 4442
+    SE_EVENT_BUS_SUBSCRIBE_PORT: 4443
+#    SCREEN_WIDTH: 1366
+#    SCREEN_HEIGHT: 768
+#    SCREEN_DEPTH: 24
+#    SCREEN_DPI: 74
+
+# 3.141.59-bismuth
+services:
+
+  selenium-hub:
+    image: selenium/hub:4.0.0
+#    image: selenium/hub:3.141.59-bismuth
+    container_name: selenium-hub
+    volumes:
+      - /dev/shm:/dev/shm
+    environment:
+      GRID_TIMEOUT: 3000
+      GRID_MAX_SESSION: 16
+      GRID_BROWSER_TIMEOUT: 3000
+      NODE_MAX_SESSION: 4
+      NODE_MAX_INSTANCES: 4
+    ports:
+      - 4442:4442
+      - 4443:4443
+      - 4444:4444
+
+  node-chrome:
+    <<: *x-default-browser
+    container_name: node-chrome
+    image: selenium/node-chrome:89.0
+#    image: selenium/node-chrome:3.141.59-bismuth
+    ports:
+      - 9001:5900
+
+  node-firefox:
+    <<: *x-default-browser
+    container_name: node-firefox
+    image: selenium/node-firefox:87.0
+#    image: selenium/node-firefox:3.141.59-bismuth
+    ports:
+      - 9002:5900
+
+  node-edge:
+    <<: *x-default-browser
+    container_name: node-edge
+    image: selenium/node-edge:91.0
+#    image: selenium/node-edge:3.141.59-bismuth
+    ports:
+      - 9003:5900
+
+  node-chrome-video:
+    image: selenium/video:ffmpeg-4.3.1-20210402
+    stop_signal: SIGKILL
+    stdin_open: true
+    tty: true
+    user: ${UID}:${GID}
+    depends_on:
+      - node-chrome
+    volumes:
+      - ./recordings:/videos:rw
+    environment:
+      DISPLAY_CONTAINER_NAME: node-chrome
+      FILE_NAME: node-chrome-video.mp4
+
+  integration-test:
+    image: gradle:6.8.3-jdk15-hotspot
+    container_name: integration-test
+    tty: true
+    stop_signal: SIGKILL
+    stdin_open: true
+#    user: ${UID}:${GID}
+    working_dir: /home/gradle/project
+    volumes:
+      - $PWD/src:/home/gradle/project/src:ro
+      - $PWD/screenshot:/home/gradle/project/screenshot:rw
+      - $PWD/build.gradle:/home/gradle/project/build.gradle:ro
+      - $PWD/settings.gradle:/home/gradle/project/settings.gradle:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      SELENIUM_HUB_HOST: http://selenium.hub:4444
+    command: gradle clean integrationTest --no-build-cache --no-daemon --info
+    links:
+      - selenium-hub:selenium.hub
+    depends_on:
+      - node-chrome-video
